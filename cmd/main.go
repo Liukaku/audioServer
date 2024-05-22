@@ -19,6 +19,9 @@ var k = ""
 
 
 func main() {
+	var enableServer string
+	fmt.Println("Enable Server? y/N")
+	fmt.Scanln(&enableServer)
 	ch := make(chan string, 2)
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -26,7 +29,9 @@ func main() {
 	go keepGoing(ch, &wg)
 	// <- song
 
-	go runServer(ch, &wg)
+	if enableServer == "y" {
+		go runServer()
+	}
 	
 	wg.Wait()
 	// http server for getting up to date requests 
@@ -46,7 +51,8 @@ func keepGoing(ch chan string, wg *sync.WaitGroup) {
 	// fmt.Println(ok)
 	// fmt.Println(val)
 	// song <- k
-	fmt.Printf("song %s", k)
+	songStr := fmt.Sprintf("song %s", k)
+	fmt.Println(songStr)
 	songToPlay := fmt.Sprintf("./audio/BEATS/Track_00%s.mp3", k)
 	f, err := os.Open(songToPlay)
 	
@@ -63,24 +69,56 @@ func keepGoing(ch chan string, wg *sync.WaitGroup) {
 	
 	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
 	
-	done := make(chan bool)
+	// done := make(chan bool)
 	
-	speaker.Play(beep.Seq(streamer, beep.Callback(func() {
-		done <- true
-	})))
-	
-	// <- song 
-	
-	<- done
-	
-	// close(song)
-	
+	// fmt.Println("Skip current song? Y/n")
+	// var skipStr string
+	// for !<- done {
+		// 	fmt.Scanln(&skipStr)
+		// 	if skipStr != "n" {
+			// 		done <- true
+			// 	}
+			// }
+			
+			loop := beep.Loop(1, streamer)
+			ctrl := &beep.Ctrl{Streamer: loop, Paused: false }
+			
+			speaker.Play(beep.Seq(ctrl, beep.Callback(func(){
+				ctrl.Paused = true
+				// done <- true
+				fmt.Println("fuck me")
+			})))
+			
+			
+	for !ctrl.Paused {
+		if ctrl.Paused {
+			fmt.Println("exiting early")
+			break
+		}
+		// var skipStr string
+		fmt.Println("Skip current song? Y/n")
+		// fmt.Scanln(&skipStr)
+		fmt.Scanln()
+		
+		// if skipStr != "n" {
+			fmt.Println("skipping")
+			speaker.Lock()
+			ctrl.Paused = true
+			speaker.Unlock()
+			break
+		// }
+
+	}
+	fmt.Println("alo early")
+
+	fmt.Println("alo")
 	wg.Add(1)
 	keepGoing(ch, wg)
-	// defer streamer.Close()
+
 }
 
-func runServer(curr <- chan string, wg *sync.WaitGroup){
+// func runServer(curr <- chan string, wg *sync.WaitGroup){
+func runServer(){
 	
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// wg.Add(1)
